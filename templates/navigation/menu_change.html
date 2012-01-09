@@ -1,0 +1,211 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_modify adminmedia pdb_tags %}
+{% load url from future %}
+
+{% block extrahead %}{{ block.super }}
+{% url 'admin:jsi18n' as jsi18nurl %}
+<script type="text/javascript" src="{{ jsi18nurl|default:"../../../jsi18n/" }}"></script>
+{{ media }}
+    <script type="text/javascript" src="{{ STATIC_URL }}admin/js/jquery.min.js"></script>
+    <script type="text/javascript" src="{{ STATIC_URL }}js/jstree/jquery.jstree.js"></script>
+
+<script type="text/javascript">
+
+    (function($){
+        $(function(){
+
+
+            // Automatically include X-CSRFToken header with all Ajax requests, containing the
+            // token from the csrftoken cookie.
+            $('html').ajaxSend(function(event, xhr, settings) {
+                function getCookie(name) {
+                    var cookieValue = null;
+                    if (document.cookie && document.cookie != '') {
+                        var cookies = document.cookie.split(';');
+                        for (var i = 0; i < cookies.length; i++) {
+                            var cookie = jQuery.trim(cookies[i]);
+                            if (cookie.substring(0, name.length + 1) == (name + '=')) {
+                                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                                break;
+                            }
+                        }
+                    }
+                    return cookieValue;
+                }
+                if (!(/^http:.*/.test(settings.url) || /^https:.*/.test(settings.url))) {
+                    xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                }
+            });
+
+
+
+            var tree_data = $('.tree:first');
+            console.log(tree_data);
+            var tree = $('<div></div>', {
+                'id': 'tree'
+            }).insertBefore(tree_data).jstree({
+
+                'core': {
+                    'animation': 0,
+                    'html_titles': true,
+                    'initially_open': [
+                        {% for node in obj.items %}
+                            '#node-{{ node.pk }}',
+                        {% endfor %}
+                    ],
+                    'li_height': '31px'
+                },
+
+                'dnd': {
+                    'drop_target': '#tree',
+                    'drop_finish': function(data){
+
+                        $nodes = $('.node');
+
+                        // Ennumerate the parent attribute
+                        $nodes.each(function(index, element){
+                            var $e = $(element),
+                                $p = $($e.parents('.node')[0]);
+                            $e.attr('data-parent_id', $p.length ? $p.attr('data-node_id') : '');
+                        });
+
+                        $('#tree').add($nodes).filter(':has(> ul)').each(function(index, element){
+                            var $l = $(element).find('> ul > li').each(function(index, element){
+                                $(element).attr('data-order', index);
+                            });
+                        });
+
+                        // Assemble data for Ajax POST
+                        var ajax_data = {};
+                        $nodes.each(function(index, element){
+                            var $e = $(element);
+                            ajax_data[$e.attr('data-node_id')] = $e.attr('data-menu_id') + ':' + $e.attr('data-parent_id') + ',' + $e.attr('data-order');
+                        });
+                        console.log(ajax_data);
+
+                        // Save parent + order data
+                        $.ajax({
+                            'cache': false,
+                            'data': ajax_data,
+                            'type': 'POST',
+                            'url': '/admin/navigation/menu/parentsorders/'
+                        });
+
+                    }
+                },
+
+                'html_data': {
+                    'data': tree_data,
+                    'ajax': false
+                },
+
+                'search': {
+                    'case_insensitive': true
+                },
+
+                'themes': {
+                    'dots': false,
+                    'icons': false
+                },
+
+                'plugins': ['themes', 'html_data', 'dnd', 'search']
+
+            });
+
+        });
+    })(jQuery)
+
+</script>
+{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% load adminmedia %}{% admin_media_prefix %}css/dashboard.css" />
+    <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
+    <link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}css/admin_index.css" />
+{% endblock %}
+
+{% block coltype %}{% if ordered_objects %}colMS{% else %}colM{% endif %}{% endblock %}
+
+{% block bodyclass %}{{ opts.app_label }}-{{ opts.object_name.lower }} change-form{% endblock %}
+
+{% block breadcrumbs %}{% if not is_popup %}
+<div class="breadcrumbs">
+     <a href="../../../">{% trans "Home" %}</a> &rsaquo;
+     {% if has_change_permission %}<a href="../">{{ opts.verbose_name_plural|capfirst }}</a>{% else %}{{ opts.verbose_name_plural|capfirst }}{% endif %} &rsaquo;
+     {% if add %}{% trans "Add" %} {{ opts.verbose_name }}{% else %}{{ original|truncatewords:"18" }}{% endif %}
+</div>
+{% endif %}{% endblock %}
+
+{% block content %}<div id="content-main">
+{% block object-tools %}
+{% if change %}{% if not is_popup %}
+  <ul class="object-tools">
+    {% block object-tools-items %}
+    <li><a href="{{ obj.get_add_folder_url }}">Add Folder</a></li>
+    <li><a href="{{ obj.get_add_page_url }}">Add Page</a></li>
+    <li><a href="{{ obj.get_add_link_url }}">Add Link</a></li>
+    {% if has_absolute_url %}<li><a href="../../../r/{{ content_type_id }}/{{ object_id }}/" class="viewsitelink">{% trans "View on site" %}</a></li>{% endif%}
+    {% endblock %}
+  </ul>
+{% endif %}{% endif %}
+{% endblock %}
+<form {% if has_file_field %}enctype="multipart/form-data" {% endif %}action="{{ form_url }}" method="post" id="{{ opts.module_name }}_form">{% csrf_token %}{% block form_top %}{% endblock %}
+<div>
+{% if is_popup %}<input type="hidden" name="_popup" value="1" />{% endif %}
+
+
+{% load mptt_tags %}
+
+{% if obj.items %}
+<ul class="tree">
+    {% recursetree obj.items %}
+        <li id="node-{{ node.pk }}" data-node_id="{{ node.pk }}" data-parent_id="{{ node.parent.pk }}" data-order="{{ node.order }}" data-menu_id="{{ node.menu.pk }}" class="clearfix node">
+            <div class="data">
+                <a href="{{ node.get_absolute_url }}"><span>{{ node.obj }}</span></a>
+                <div class="actions">
+                    <a class="edit" href="{{ node.get_edit_url }}">Edit</a>
+                    <a class="delete" href="{{ node.get_delete_url }}">Delete</a>
+                </div>
+            </div>
+            {% if not node.is_leaf_node %}
+                <ul class="children" class="clearfix">
+                    {{ children }}
+                </ul>
+            {% endif %}
+        </li>
+    {% endrecursetree %}
+</ul>
+{% endif %}
+{% if add %}
+    {% block field_sets %}
+{% for fieldset in adminform %}
+  {% include "admin/includes/fieldset.html" %}
+{% endfor %}
+{% endblock %}
+
+{% block after_field_sets %}{% endblock %}
+
+{% block inline_field_sets %}
+{% for inline_admin_formset in inline_admin_formsets %}
+    {% include inline_admin_formset.opts.template %}
+{% endfor %}
+{% endblock %}
+
+{% block after_related_objects %}{% endblock %}
+
+{% submit_row %}
+
+{% if adminform and add %}
+   <script type="text/javascript">document.getElementById("{{ adminform.first_field.id_for_label }}").focus();</script>
+{% endif %}
+
+{# JavaScript for prepopulated fields #}
+{% prepopulated_fields_js %}
+
+{% endif %}
+
+
+</div>
+</form></div>
+{% endblock %}
