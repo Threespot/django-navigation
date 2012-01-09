@@ -1,0 +1,18 @@
+{% load navigation_tags %}
+
+<style type="text/css" media="screen">
+    .active-trail{
+        font-weight: bold;
+    }
+    .active{
+        font-style: italic;
+    }
+</style>
+
+{% if leaves %}
+    <ul id="{{ menu.name|slugify }}">
+        {% for leaf in leaves %}
+            {% _render_leaf leaf %}
+        {% endfor %}
+    </ul>
+{% endif %}

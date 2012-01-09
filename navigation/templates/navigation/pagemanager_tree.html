@@ -1,0 +1,18 @@
+{% load navigation_tags %}
+
+{% load_current_page %}
+
+<li>
+    <a href="{{ page.get_absolute_url }}">{{ page.title }}</a> ({{ current_page }} -- {{ page.get_absolute_url }})
+    {% if depth >= 0 %}
+        {% with page.get_children as leaves %}
+            {% if leaves %}
+                <ul>
+                    {% for leaf in leaves %}
+                        {% _render_pagemanager_tree leaf %}
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+    {% endif %}
+</li>

@@ -1,0 +1,14 @@
+{% load navigation_tags %}
+
+<li>
+    {{ folder.name }}
+    {% with menu_item.get_children as leaves %}
+        {% if leaves %}
+            <ul>
+                {% for leaf in leaves %}
+                    {% _render_leaf leaf %}
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endwith %}
+</li>
