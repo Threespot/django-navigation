@@ -5,7 +5,7 @@ from django.core.urlresolvers import reverse
 
 from mptt.models import MPTTModel, TreeForeignKey
 
-from staticpages.app_settings import STATICPAGES_PAGE_MODEL
+from pagemanager.app_settings import PAGEMANAGER_PAGE_MODEL
 
 
 class MenuItem(MPTTModel):
@@ -65,7 +65,7 @@ class BaseMenuLeaf(models.Model):
 
 
 class MenuPage(BaseMenuLeaf):
-    page = TreeForeignKey(STATICPAGES_PAGE_MODEL)
+    page = TreeForeignKey(PAGEMANAGER_PAGE_MODEL)
     depth = models.IntegerField(default=0)
 
     def __unicode__(self, plural='s'):
