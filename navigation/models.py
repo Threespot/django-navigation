@@ -95,6 +95,7 @@ class MenuLink(BaseMenuLeaf):
 
 class Menu(models.Model):
     name = models.CharField(max_length=32)
+    template = models.CharField(max_length=128, default='navigation/menu.html')
 
     class Meta:
         ordering = ['name']
