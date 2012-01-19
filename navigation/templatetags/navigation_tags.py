@@ -35,6 +35,7 @@ class RenderMenuNode(template.Node):
         # constituent items in this menu.
         except KeyError:
             node_obj = None
+            level = 1
             is_recursive_call = False
             node_name = self.node_name
             node_type = None
@@ -60,6 +61,7 @@ class RenderMenuNode(template.Node):
             is_recursive_call = True
             node = context.get(self.node_name)
             use_template = context.get('template')
+            level = int(context.get('level')) + 1
 
             try:
                 node_obj = node.obj
@@ -109,7 +111,8 @@ class RenderMenuNode(template.Node):
             'children': children,
             'path': path,
             'is_active_page': is_active_page,
-            'is_active_trail': is_active_trail
+            'is_active_trail': is_active_trail,
+            'level': level
         })
 
 

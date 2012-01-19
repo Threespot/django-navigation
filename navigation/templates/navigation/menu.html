@@ -9,6 +9,7 @@ Available context:
 - {{ type }} - a string representing the type of leaf (e.g. one of 'page',
   'folder', or 'link')
 - {{ children }} - a list of the children of leaf
+- {{ level }} - a 1-based index of the number of levels deep into the menu
 - {{ is_recursive_call }} - True if this is the first call of the {% menu %}
   tag for this menu, False if it was called recursively.
 
