@@ -16,6 +16,7 @@ class RenderMenuNode(template.Node):
 
     def render(self, context):
 
+        is_active_menu = False
         is_active_page = False
         is_active_trail = False
 
@@ -47,13 +48,23 @@ class RenderMenuNode(template.Node):
                     menu_name = node_name[1:-1]
                 else:
                     menu_name = node_name
-                node = Menu.objects.get(name=menu_name)
+                try:
+                    node = Menu.objects.get(name=menu_name)
+                except Menu.DoesNotExist:
+                    return ''
+
+            except Menu.DoesNotExist:
+                return ''
             try:
                 inherited_depth = node.depth
             except AttributeError:
                 inherited_depth = 0
             children = node.menuitem_set.filter(parent=None)
             use_template = node.template
+
+            is_active_menu = True in \
+                [path.startswith(child.obj.page.get_absolute_url()) for child \
+                in children if hasattr(child.obj, 'page')]
 
         # This call was performed automatically by the {% menu %} tag
         else:
@@ -112,6 +123,7 @@ class RenderMenuNode(template.Node):
             'path': path,
             'is_active_page': is_active_page,
             'is_active_trail': is_active_trail,
+            'is_active_menu': is_active_menu,
             'level': level
         })
 
