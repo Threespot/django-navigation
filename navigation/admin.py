@@ -24,7 +24,7 @@ class MenuAdmin(admin.ModelAdmin):
             add, change, form_url, obj)
 
     def get_urls(self):
-        from django.conf.urls.defaults import *
+        from django.conf.urls.defaults import patterns
         urls = super(MenuAdmin, self).get_urls()
         more = patterns('',
             (r'^parentsorders/$', self.admin_site.admin_view(self.parents_orders))
