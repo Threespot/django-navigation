@@ -31,6 +31,7 @@ class MenuItem(MPTTModel):
 class BaseMenuLeaf(models.Model):
     menu_items = generic.GenericRelation(MenuItem, object_id_field="obj_id", \
         content_type_field="obj_type")
+    html_class_name = models.CharField(blank=True, max_length=30)
 
     class Meta:
         abstract = True
