@@ -120,7 +120,6 @@ class MenuLeafAdmin(admin.ModelAdmin):
             return HttpResponseRedirect(obj.menu_item.menu.get_edit_url())
 
 
-admin.site.unregister(Site)
 admin.site.register(Menu, MenuAdmin)
 admin.site.register(MenuPage, MenuLeafAdmin)
 admin.site.register(MenuFolder, MenuLeafAdmin)
