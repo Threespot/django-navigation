@@ -88,7 +88,7 @@ class MenuFolder(BaseMenuLeaf):
 
 class MenuLink(BaseMenuLeaf):
     name = models.CharField(max_length=128)
-    url = models.URLField(verify_exists=False, max_length=512)
+    url = models.CharField(max_length=512)
 
     def __unicode__(self):
         return 'Link: %s' % self.name
