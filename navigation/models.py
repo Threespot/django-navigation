@@ -21,6 +21,9 @@ class MenuItem(MPTTModel):
     def __unicode__(self):
         return 'Type %s, ID %s' % (self.obj_type, self.obj_id,)
 
+    class MPTTMeta:
+        order_insertion_by = ['order']
+
     def get_edit_url(self):
         return self.obj.get_edit_url()
 
