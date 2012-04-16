@@ -6,6 +6,7 @@ from django.core.urlresolvers import reverse
 from mptt.models import MPTTModel, TreeForeignKey
 
 from pagemanager.app_settings import PAGEMANAGER_PAGE_MODEL
+from pagemanager.models import attach_generics
 
 
 class MenuItem(MPTTModel):
@@ -69,6 +70,7 @@ class BaseMenuLeaf(models.Model):
 
 
 class MenuPage(BaseMenuLeaf):
+    node_type = "page"
     page = TreeForeignKey(PAGEMANAGER_PAGE_MODEL)
     depth = models.IntegerField(default=0)
 
@@ -81,8 +83,16 @@ class MenuPage(BaseMenuLeaf):
             plural,
         )
 
+    def get_page_children(self):
+        level = None
+        level_num = None
+        #pages = [page for page in self.page.get_descendants() if page.level <= self.depth]
+        pages = list(self.page.get_descendants())
+        attach_generics(pages)
+        return pages
 
 class MenuFolder(BaseMenuLeaf):
+    node_type = "folder"
     name = models.CharField(max_length=128)
 
     def __unicode__(self):
@@ -90,6 +100,7 @@ class MenuFolder(BaseMenuLeaf):
 
 
 class MenuLink(BaseMenuLeaf):
+    node_type = "link"
     name = models.CharField(max_length=128)
     url = models.CharField(max_length=512)
 

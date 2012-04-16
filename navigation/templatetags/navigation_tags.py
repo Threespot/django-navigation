@@ -1,152 +1,109 @@
 from django import template
 from django.template.loader import render_to_string
+from django.contrib.contenttypes.models import ContentType
 
-from navigation.models import Menu, MenuPage, MenuLink, MenuFolder
+from navigation.models import Menu, MenuItem, MenuPage, MenuLink, MenuFolder
+from pagemanager.models import Page
+from pagemanager.models import attach_generics as attach_page_generics
 
 register = template.Library()
+
+def attach_menu_generics(queryset, prefetch_pages=False):
+    # manually attach generic relations to avoid a ridiculous
+    # amount of database calls
+    generics = {}
+    for item in queryset:
+        # create a dictionary of object ids per content type id
+        generics.setdefault(item.obj_type_id, set()).add(item.obj_id)
+    # fetch all associated content types with the queryset
+    content_types = ContentType.objects.in_bulk(generics.keys())
+    relations = {}
+    for ct, fk_list in generics.items():
+        # for every content type, fetch all the object ids of that type
+        ct_model = content_types[ct].model_class()
+        relations[ct] = ct_model.objects.in_bulk(list(fk_list))
+    for item in queryset:
+        setattr(item, 'obj', relations[item.obj_type_id][item.obj_id])
+    # prefetch page for all page items
+    if not prefetch_pages:
+        return
+    pages = []
+    for item in queryset:
+        if item.obj.node_type == "page":
+            pages.append(item.obj.page_id)
+    pages = Page.objects.filter(id__in=pages)
+    attach_page_generics(pages)
+    pages = dict((page.id, page) for page in pages)
+    for item in queryset:
+        if item.obj.node_type == "page":
+            item.obj.page = pages[item.obj.page_id]
 
 
 class RenderMenuNode(template.Node):
     """
     The node used by the {% menu %} template tag
     """
-    def __init__(self, node_name, inherited_depth):
-        self.node_name = node_name
-        self.inherited_depth = inherited_depth
+    def __init__(self, menu_name):
+        self.menu_name = menu_name
 
     def render(self, context):
 
-        is_active_menu = False
-        is_active_page = False
-        is_active_trail = False
+        path = context.get('request').META['PATH_INFO']
 
-        # Since we are calling this recursively, values inserted to the context
-        # by context processors tend to get lost. We bypass this by extracting
-        # the info we need from request.META and manually inserting it into the
-        # context of future calls.
-        try:
-            path = context['path']
-        except KeyError:
-            path = context.get('request').META['PATH_INFO']
+        menu = Menu.objects.get(name__iexact=self.menu_name)
+        nodes = list(MenuItem.tree.filter(menu=menu))
+        attach_menu_generics(nodes, prefetch_pages=True)
+        template = menu.template
 
-        try:
-            node = context[self.node_name]
+        whitelist = [
+            "navigation/utility.html",
+            "navigation/about.html",
+            "navigation/main.html",
+            ]
 
-        # This was not a recursive call, so we need to gather all the
-        # constituent items in this menu.
-        except KeyError:
-            node_obj = None
-            level = 1
-            is_recursive_call = False
-            node_name = self.node_name
-            node_type = None
-            try:
-                node = Menu.objects.get(pk=self.node_name)
-            except ValueError:
-                if (node_name[0] == node_name[-1] and node_name[0] \
-                    in ('"', "'")):
-                    menu_name = node_name[1:-1]
-                else:
-                    menu_name = node_name
-                try:
-                    node = Menu.objects.get(name=menu_name)
-                except Menu.DoesNotExist:
-                    return ''
-
-            except Menu.DoesNotExist:
-                return ''
-            try:
-                inherited_depth = node.depth
-            except AttributeError:
-                inherited_depth = 0
-            children = node.menuitem_set.filter(parent=None)
-            use_template = node.template
-
-            is_active_menu = True in \
-                [path.startswith(child.obj.page.get_absolute_url()) for child \
-                in children if hasattr(child.obj, 'page')]
-
-        # This call was performed automatically by the {% menu %} tag
-        else:
-
-            is_recursive_call = True
-            node = context.get(self.node_name)
-            use_template = context.get('template')
-            level = int(context.get('level')) + 1
-
-            try:
-                node_obj = node.obj
-
-            # This is the child of a page that is inherited from the site tree
-            # via MenuPage with depth, so there is no corresponding MenuPage for
-            # this node.
-            except AttributeError:
-                children = node.get_children()
-                inherited_depth = int(context[self.inherited_depth]) - 1
-                node_type = 'page'
-                node_obj = {
-                    'page': node
-                }
-                is_active_page = path == node.get_absolute_url()
-                is_active_trail = path.startswith(node.get_absolute_url())
-
-            else:
-
-                # This is a Folder
-                if isinstance(node_obj, MenuFolder):
-                    children = node.get_children()
-                    inherited_depth = 0
-                    node_type = 'folder'
-
-                # This is a link
-                elif isinstance(node_obj, MenuLink):
-                    children = node.get_children()
-                    inherited_depth = 0
-                    node_type = 'link'
-
-                # This is a page directly added to the hierarchy
-                elif isinstance(node_obj, MenuPage):
-                    children = node_obj.page.get_children()
-                    inherited_depth = node_obj.depth
-                    node_type = 'page'
-                    is_active_page = path == node_obj.page.get_absolute_url()
-                    is_active_trail = path.startswith(node_obj.page.get_absolute_url())
-
-        return render_to_string(use_template, {
-            'template': use_template,
-            'node': node,
-            'leaf': node_obj,
-            'inherited_depth': inherited_depth,
-            'is_recursive_call': is_recursive_call,
-            'type': node_type,
-            'children': children,
+        if not template in whitelist:
+            template = "navigation/menu.html"
+        
+        return render_to_string(template, {
+            'menu': menu,
             'path': path,
-            'is_active_page': is_active_page,
-            'is_active_trail': is_active_trail,
-            'is_active_menu': is_active_menu,
-            'level': level
+            'nodes': nodes,
         })
 
 
 @register.tag
 def menu(parser, token):
     """
-    The template tag used to render a menu. Accepts two arguments:
+    The template tag used to render a menu.
 
     - Menu identifier, which can be one of several things:
         - A quoted string containing the name of a Menu object
         - An unquoted string containing the PK of a Menu object
         - A MenuItem instance
-    - The remaining depth to traverse, if you are displaying children inherited
-      from the site tree by using a MenuPage with a nonzero depth. This should
-      be a string parsable by int().
-
     """
-    token = token.split_contents()
-    node_name = token.pop(1)
-    try:
-        inherited_depth = token.pop(1)
-    except IndexError:
-        inherited_depth = 0
+    menu_name = token.split_contents().pop().replace('"', '')
+    return RenderMenuNode(menu_name)
 
-    return RenderMenuNode(node_name, inherited_depth)
+
+@register.filter(name='show_active_page')
+def show_active_page(value, arg):
+    if value.get_absolute_url() == arg:
+        return "active"
+    else:
+        return ""
+
+@register.filter(name='show_active_trail')
+def show_active_trail(value, arg):
+    if arg.startswith(value.get_absolute_url()):
+        return "active-trail"
+    else:
+        return ""
+
+@register.filter(name="get_nav_name")
+def get_nav_name(value):
+    """ helper filter to use instead of the inefficient get_nav_name """
+    """ value should be a Page """
+    if value.page_layout.nav_name_override:
+        return value.page_layout.nav_name_override
+    else:
+        return value.title

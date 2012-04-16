@@ -1,75 +1,49 @@
 {% load navigation_tags %}
+{% load mptt_tags %}
 
 {% comment %}
-
-Available context:
-
-- {{ leaf }} - The item in the tree (e.g. an instance of one of MenuPage, Page,
-  MenuLink, or MenuFolder)
-- {{ type }} - a string representing the type of leaf (e.g. one of 'page',
-  'folder', or 'link')
-- {{ children }} - a list of the children of leaf
-- {{ level }} - a 1-based index of the number of levels deep into the menu
-- {{ is_recursive_call }} - True if this is the first call of the {% menu %}
-  tag for this menu, False if it was called recursively.
-
-If {{ leaf }} is an instance of Page (and not MenuPage, i.e. it has inherited
-the hierarchy from the master site tree, rather than the tree from this menu),
-the the following items are also available:
-
-- {{ inherited_depth }} - the remaining depth to display
-- {{ is_active_page }} - True if the currently-displayed page is equal to the
-  leaf currently displayed, False otherwise.
-- {{ is_active_trail }} - True if the currently-displayed page is an ancestor of
-  the leaf currently displayed, False otherwise.
-
+<li class="{% if is_active_trail %}active-trail{% endif %} {% if is_active_page %}active{% endif %}">
 {% endcomment %}
 
-{% if is_recursive_call %}
+<h1>{{ menu.name }}</h1>
+<h2>Template: {{ menu.template }}</h2>
 
-    <li class="{% if is_active_trail %}active-trail{% endif %} {% if is_active_page %}active{% endif %}">
-
-        {% if type == "folder" %}
-            {{ leaf.name }}
-            {% if children %}
-                <ul>
-                    {% for child in children %}
-                        {% menu child %}
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endif %}
-
-        {% if type == "page" %}
-            <a href="{{ leaf.page.get_absolute_url }}">{{ leaf.page.title }}</a>
-            {% if inherited_depth and children %}
-                <ul>
-                    {% for child in children %}
-                        {% menu child inherited_depth %}
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endif %}
-
-        {% if type == "link" %}
-            <a href="{{ leaf.url }}">{{ leaf.name }}</a>
-            {% if children %}
-                <ul>
-                    {% for child in children %}
-                        {% menu child %}
-                    {% endfor %}
-                </ul>
-            {% endif %}
-        {% endif %}
-
-    </li>
-
-{% else %}
-
+<ul>
+  {% recursetree nodes %}
+  {% if node.obj.node_type == "folder" %}
+  <li>
+    {{ node.obj.name }}
+    {% if not node.is_leaf_node %}
     <ul>
-        {% for child in children %}
-            {% menu child depth_below %}
-        {% endfor %}
+      {{ children }}
     </ul>
-
-{% endif %}
+    {% endif %}
+  </li>
+  {% endif %}
+  {% if node.obj.node_type == "page" %}
+  <li class="{{ node.obj.page|show_active_trail:path }} {{ node.obj.page|show_active_page:path }}">
+    <a href="{{ node.obj.page.get_absolute_url }}">{{ node.obj.page.title }}</a>
+    {% recursetree node.obj.get_page_children %}
+    <li>
+      <a href="{{ node.get_absolute_url }}">{{ node.title }}</a>
+      {% if not node.is_leaf_node %}
+      <ul>
+        {{ children }}
+      </ul>
+      {% endif %}
+    </li>
+    {% endrecursetree %}
+  </li>
+  {% endif %}
+  {% if node.obj.node_type == "link" %}
+  <li>
+    <a href="{{ node.obj.url }}">{{ node.obj.name }}</a>
+    {% if not node.is_leaf_node %}
+    <ul>
+      {{ children }}
+    </ul>
+    {% endif %}
+  </li>
+  {% endif %}
+  {% endrecursetree %}
+</ul>
