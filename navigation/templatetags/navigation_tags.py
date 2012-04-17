@@ -48,7 +48,11 @@ class RenderMenuNode(template.Node):
 
     def render(self, context):
 
-        path = context.get('request').META['PATH_INFO']
+        try:
+            path = context.get('request').META['PATH_INFO']
+        except AttributeError:
+            # homepage
+            path = "/"
 
         menu = Menu.objects.get(name__iexact=self.menu_name)
         nodes = list(MenuItem.tree.filter(menu=menu))
@@ -59,6 +63,9 @@ class RenderMenuNode(template.Node):
             "navigation/utility.html",
             "navigation/about.html",
             "navigation/main.html",
+            "navigation/resources.html",
+            "navigation/programs.html",
+            "navigation/quicklinks.html"
             ]
 
         if not template in whitelist:
@@ -107,3 +114,7 @@ def get_nav_name(value):
         return value.page_layout.nav_name_override
     else:
         return value.title
+
+@register.filter
+def plustwo(value):
+    return value + 2

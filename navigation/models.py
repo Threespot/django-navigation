@@ -86,8 +86,7 @@ class MenuPage(BaseMenuLeaf):
     def get_page_children(self):
         level = None
         level_num = None
-        #pages = [page for page in self.page.get_descendants() if page.level <= self.depth]
-        pages = list(self.page.get_descendants())
+        pages = [page for page in self.page.get_descendants() if page.level <= self.depth]
         attach_generics(pages)
         return pages
 
