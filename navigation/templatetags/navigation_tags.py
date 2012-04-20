@@ -59,18 +59,6 @@ class RenderMenuNode(template.Node):
         attach_menu_generics(nodes, prefetch_pages=True)
         template = menu.template
 
-        whitelist = [
-            "navigation/utility.html",
-            "navigation/about.html",
-            "navigation/main.html",
-            "navigation/resources.html",
-            "navigation/programs.html",
-            "navigation/quicklinks.html"
-            ]
-
-        if not template in whitelist:
-            template = "navigation/menu.html"
-        
         return render_to_string(template, {
             'menu': menu,
             'path': path,
