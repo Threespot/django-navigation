@@ -63,7 +63,7 @@ class RenderMenuNode(template.Node):
             'menu': menu,
             'path': path,
             'nodes': nodes,
-        })
+        }, context)
 
 
 @register.tag
