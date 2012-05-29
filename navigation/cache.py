@@ -254,8 +254,9 @@ class SiteNav(object):
                 return cls._grow_menu(item)
 
         menu_children = map(climb, menu_children)
-        menu_children[0].first = True
-        menu_children[-1].last = True
+        if menu_children:
+            menu_children[0].first = True
+            menu_children[-1].last = True
         return menu_children
 
     def keys(self):
@@ -265,8 +266,11 @@ class SiteNav(object):
         """
         Recache the menu tree with the given key.
         """
-        menu_item, _ = self[key]
-        menu = Menu.objects.get(pk=menu_item.pk)
+        try:
+            menu_item, _ = self[key]
+            menu = Menu.objects.get(pk=menu_item.pk)
+        except KeyError:
+            menu = Menu.objects.get(name=key)
         self.menu_list[key] = self.grow(menu)
 
     def recache_all(self):
