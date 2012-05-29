@@ -142,6 +142,7 @@
 {% if change %}{% if not is_popup %}
   <ul class="object-tools">
     {% block object-tools-items %}
+    {% if user.is_superuser %}<li id="rebuild-nav"><a href="rebuild/">Rebuild</a></li>{% endif %}
     <li><a href="{{ obj.get_add_folder_url }}">Add Folder</a></li>
     <li><a href="{{ obj.get_add_page_url }}">Add Page</a></li>
     <li><a href="{{ obj.get_add_link_url }}">Add Link</a></li>

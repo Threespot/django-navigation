@@ -1,12 +1,23 @@
+from functools import partial
+import re
+
 from django import template
 from django.template.loader import render_to_string
 from django.contrib.contenttypes.models import ContentType
 
-from navigation.models import Menu, MenuItem, MenuPage, MenuLink, MenuFolder
+from navigation.models import Menu, MenuItem
 from pagemanager.models import Page
 from pagemanager.models import attach_generics as attach_page_generics
 
+from navigation.cache import site_nav
+
+
+# Regex that matches on leading or trailing slashes.
+outer_slashes = re.compile("(^/|/$)")
+
+
 register = template.Library()
+
 
 def attach_menu_generics(queryset, prefetch_pages=False):
     # manually attach generic relations to avoid a ridiculous
@@ -106,3 +117,69 @@ def get_nav_name(value):
 @register.filter
 def plustwo(value):
     return value + 2
+
+
+def fast_menu(request, nav_name, prefix=None):
+    """
+    Render the given menu item (by name).
+
+    Uses an in-memory version of the navigation tree to render the navigation
+    very quickly.
+
+    prefix can be a string with an initial, ignorable part of the path (e.g. resources)
+
+    """
+    if nav_name not in site_nav:
+        raise KeyError('Unknown site nav name: "%s"' % nav_name)
+    container, menu_list = site_nav[nav_name]
+    # Strip outer slashes and split path into a list of slugs.
+    try:
+        path = outer_slashes.sub("", request.META['PATH_INFO']).split("/")
+        if prefix == path[0]:
+            path = path[1:]
+    except (KeyError, AttributeError):
+        # We have a homepage path.
+        path = []
+    # Bind the ``container`` and ``request`` variables to the function: they will not change on any call.
+    _render_node = partial(render_node, container, request)
+    return "".join([_render_node(node, path) for node in menu_list])
+fast_menu.function = True
+fast_menu.takes_request = True
+
+
+def get_html_class_name(node, is_open):
+    """
+    Calculate the proper HTML class name for the <li> object representing the given node 
+    """
+    class_name = "%s %s" % (
+        node.html_class_name,
+        is_open and 'open' or ''
+    )
+    return class_name.strip()
+
+
+def render_node(container, request, node, path, level=2):
+    """
+    A function that can recursively render <li> elements representing a navigation object.
+    """
+    slug = getattr(node, 'slug', None)
+    is_open = (path and path[0] == slug) or node.type == "folder"
+    active = is_open and len(path) == 1
+    html_class_name = get_html_class_name(node, is_open)
+    lowest_level = level == 2
+    if is_open and not node.is_leaf:
+        path = path[1:]
+        lower_level = level + 1
+        children = "".join([render_node(container, request, child, path, level=lower_level) for child in node.values()])
+    else:
+        children = None
+    return render_to_string(container.template, {
+        'active': active,
+        'children': children,
+        'html_class_name': html_class_name,
+        'level': level,
+        'lowest_level': lowest_level,
+        'node': node,
+        'request': request 
+    })
+

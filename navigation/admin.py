@@ -1,8 +1,7 @@
 from django.contrib import admin
-from django.contrib.sites.models import Site
 from django.core.urlresolvers import reverse
-from django.db import models
 from django.http import HttpResponse, Http404, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.utils.encoding import force_unicode
 
 from navigation.models import Menu, MenuItem, MenuPage, MenuFolder, MenuLink
@@ -10,6 +9,9 @@ from navigation.models import Menu, MenuItem, MenuPage, MenuFolder, MenuLink
 
 class MenuAdmin(admin.ModelAdmin):
     change_form_template = 'navigation/menu_change.html'
+
+    class Media:
+        js = ("js/admin_rebuild_nav.js",)
 
     def changelist_view(self, request, extra_context=None):
         """
@@ -27,7 +29,8 @@ class MenuAdmin(admin.ModelAdmin):
         from django.conf.urls.defaults import patterns
         urls = super(MenuAdmin, self).get_urls()
         more = patterns('',
-            (r'^parentsorders/$', self.admin_site.admin_view(self.parents_orders))
+            (r'^parentsorders/$', self.admin_site.admin_view(self.parents_orders)),
+            (r'^(.+)/rebuild/$', self.admin_site.admin_view(self.rebuild_view))
         )
         return more + urls
 
@@ -46,6 +49,19 @@ class MenuAdmin(admin.ModelAdmin):
                 item.save()
             return HttpResponse()
         raise Http404
+
+    def rebuild_view(self, request, pk):
+        """
+        A view (expected to be called via Ajax) that rebuilds the menu 
+        cache of the menu with the given primary key.
+        """
+        from navigation.cache import site_nav
+        menu = get_object_or_404(Menu, pk=pk)
+        if menu.name in site_nav:
+            site_nav.recache(menu.name)
+            return HttpResponse('"%s" navigation rebuilt.' % menu.name)
+        else:
+            return HttpResponse('"%s" navigation could not be found.' % menu.name)
 
 
 class MenuLeafAdmin(admin.ModelAdmin):
