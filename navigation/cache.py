@@ -326,7 +326,10 @@ def menu_item_save(sender, instance, raw, using, **kwargs):
             initial = path_pieces.pop(0)
             for page in pages:
                 if hasattr(page, 'slug') and page.slug == initial:
-                    leaf = reduce(lambda n, k: n[k], path_pieces, pages[1])
+                    try:
+                        leaf = reduce(lambda n, k: n[k], path_pieces, pages[1])
+                    except KeyError:
+                        leaf = None
                     if not leaf:
                         # Page does not exist where it's supposed to, may have been moved.
                         site_nav.recache(key)
