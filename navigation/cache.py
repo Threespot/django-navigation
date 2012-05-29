@@ -118,6 +118,8 @@ class PageNav(Node):
         layout  = page.page_layout
         for layout_field in ('show_in_nav', 'show_children'):
             setattr(self, layout_field, getattr(layout, layout_field, True  ))
+        if layout.nav_name_override:
+            self.title = layout.nav_name_override
         self.url = page.get_absolute_url()
         self.html_class_name = getattr(page, 'html_class_name', '')
         self.limit_depth_to = getattr(page, 'depth', None)
