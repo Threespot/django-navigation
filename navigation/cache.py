@@ -120,7 +120,12 @@ class PageNav(Node):
             setattr(self, layout_field, getattr(layout, layout_field, True  ))
         if layout.nav_name_override:
             self.title = layout.nav_name_override
-        self.url = page.get_absolute_url()
+        # Note that we don't call ``page.get_absolute_url()`` here even though it would seem
+        # to be the obvious solution. This is becuase the project's urls file has likely not
+        # been loaded when this code is called (in a WSGI environment, at lest). This would
+        # create a circular dependency. Instead, figure out the URL without invoking the
+        # URL/view routing machinery.
+        self.url = page.materialized_path + "/"
         self.html_class_name = getattr(page, 'html_class_name', '')
         self.limit_depth_to = getattr(page, 'depth', None)
 
