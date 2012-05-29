@@ -1,6 +1,6 @@
 from distutils.core import setup
 
-VERSION = '0.3'
+VERSION = '0.4'
 
 classifiers = [
     "Intended Audience :: Developers",
