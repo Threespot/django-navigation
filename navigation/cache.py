@@ -125,7 +125,7 @@ class PageNav(Node):
         # been loaded when this code is called (in a WSGI environment, at lest). This would
         # create a circular dependency. Instead, figure out the URL without invoking the
         # URL/view routing machinery.
-        self.url = page.materialized_path + "/"
+        self.url = "/" + page.materialized_path + "/"
         self.html_class_name = getattr(page, 'html_class_name', '')
         self.limit_depth_to = getattr(page, 'depth', None)
 
