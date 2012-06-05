@@ -319,7 +319,11 @@ def menu_save(sender, instance, raw, using, **kwargs):
 @receiver(post_save)
 def menu_item_save(sender, instance, raw, using, **kwargs):
     if issubclass(sender, PageLayout) and bool(instance.page):
-        saved_page = instance.page.all()[0]
+        # Catch index error when a brand new page is being created.
+        try:
+            saved_page = instance.page.all()[0]
+        except IndexError:
+            return
     elif isinstance(instance, Page):
         saved_page = instance
     else:
