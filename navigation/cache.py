@@ -118,7 +118,7 @@ class PageNav(Node):
         layout  = page.page_layout
         for layout_field in ('show_in_nav', 'show_children'):
             setattr(self, layout_field, getattr(layout, layout_field, True  ))
-        if layout.nav_name_override:
+        if getattr(layout, 'nav_name_override', False):
             self.title = layout.nav_name_override
         # Note that we don't call ``page.get_absolute_url()`` here even though it would seem
         # to be the obvious solution. This is becuase the project's urls file has likely not
