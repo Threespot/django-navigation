@@ -50,6 +50,7 @@ class MenuNav(Node):
         'template', 'title', 'type', 'url'
     )
     is_public = True
+    is_published = True
     show_in_nav = True
 
     def __init__(self, obj):
@@ -142,7 +143,19 @@ class PageNav(Node):
 
     @property
     def is_public(self):
-        return self.visibility == 'public' and self.status == 'published' and self.show_in_nav
+        """
+        Boolean specifying whether the page is publicly visible. Users who
+        are logged in should still see such pages in the nav.
+        """
+        return self.visibility == 'public'
+
+    @property
+    def is_published(self):
+        """
+        Boolean specifying whether the page has been published and should be shown. Users who
+        are logged in should still *not* see such pages.
+        """
+        return self.status == 'published' and self.show_in_nav
 
 
 class SiteNav(object):
