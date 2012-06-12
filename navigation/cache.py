@@ -49,6 +49,8 @@ class MenuNav(Node):
         'html_class_name','pk', 'slug', 
         'template', 'title', 'type', 'url'
     )
+    is_public = True
+    show_in_nav = True
 
     def __init__(self, obj):
         super(MenuNav, self).__init__()
