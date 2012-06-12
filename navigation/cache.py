@@ -152,8 +152,8 @@ class PageNav(Node):
     @property
     def is_published(self):
         """
-        Boolean specifying whether the page has been published and should be shown. Users who
-        are logged in should still *not* see such pages.
+        Boolean specifying whether the page has been published and should be shown.
+        Users should *not* see unpublished pages regardless of whether they are logged-in.
         """
         return self.status == 'published' and self.show_in_nav
 
