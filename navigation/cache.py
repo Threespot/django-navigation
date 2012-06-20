@@ -1,13 +1,13 @@
 from itertools import chain
 
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils.datastructures import SortedDict
 
 from navigation.models import Menu, MenuFolder, MenuItem, MenuLink, MenuPage
 
-from pagemanager.models import Page, PageLayout
-
+from pagemanager.models import Page
+from pagemanager.signals import page_edited, page_moved
 
 
 class Node(object):
@@ -162,7 +162,7 @@ class SiteNav(object):
     """
     A dictionary-like container class for all site navigation
     """
-
+    
     def __getitem__(self, key):
         return self.menu_containers.__getitem__(key), self.menu_list.__getitem__(key)
 
@@ -178,9 +178,10 @@ class SiteNav(object):
     def __iter__(self):
         return self.menu_list.__iter__()
 
-    def _get_page_id_set(self, key):
+    def _get_node_id_sets(self, key):
         """
-        Returns a set of all page IDs associated with a particular nav item tree.
+        Returns a dictionary of sets of all node type IDs associated 
+        with a particular nav item tree.
         """
         _, menu_list = self[key]
 
@@ -201,7 +202,13 @@ class SiteNav(object):
                 a[key] = a[key] | b[key]
             return a
 
-        return reduce(merge_dicts, all_dicts)
+        retval = reduce(merge_dicts, all_dicts)
+        # Make sure that all types of items are represented in the returned dictionary,
+        # even if it's just an empty set.
+        for required_key in ('page', 'link', 'folder'):
+            if required_key not in retval:
+                retval[required_key] = set([])
+        return retval
 
     @classmethod
     def _grow_menu(cls, menu):
@@ -248,19 +255,7 @@ class SiteNav(object):
 
     def get_items_for_type(self, t):
         assert t in ('page', 'link', 'folder'), "Incorrect type."
-        return [(key, site_nav._get_page_id_set(key).get(t, [])) for key in site_nav.keys()]
-
-    def get_navs_for_page(self, page_id):
-        """
-        Returns a list of top-level navigation item keys for trees that have a page with the
-        given ID somewhere in the tree.
-        """
-        navs = []
-        for key in self.keys():
-            page_ids = self._get_page_id_set(key)
-            if page_id in page_ids:
-                navs.append(key)
-        return navs
+        return [(key, site_nav._get_node_id_sets(key).get(t, [])) for key in site_nav.keys()]
 
     @classmethod
     def grow(cls, menu_obj):
@@ -309,7 +304,14 @@ class SiteNav(object):
 # This global object represents the default navigation set for the site.
 site_nav = SiteNav()
 
-# Register signals to update cache when database objects are saved.
+
+############################################################################
+#
+#     Signal handlers for recaching on changes to Page tree or navigation.
+#
+############################################################################
+
+
 @receiver(post_save, sender=MenuFolder)
 def folder_save(sender, instance, raw, using, **kwargs):
     items = site_nav.get_items_for_type('folder')
@@ -331,40 +333,47 @@ def menu_save(sender, instance, raw, using, **kwargs):
     site_nav.recache(instance.name)
 
 
-@receiver(post_save)
-def menu_item_save(sender, instance, raw, using, **kwargs):
-    if issubclass(sender, PageLayout) and bool(instance.page):
-        # Catch index error when a brand new page is being created.
-        try:
-            saved_page = instance.page.all()[0]
-        except IndexError:
-            return
-    elif isinstance(instance, Page):
-        saved_page = instance
-    else:
+@receiver(post_delete, sender=Page)
+def page_deleted(sender, instance, using, **kwargs):
+    # If the page being deleted was not showing up in the nav, anyway then
+    # there is no need to recache.
+    if not instance.is_published() or instance.page_layout.show_in_nav:
         return
-    # Create a page opject based on the current state of the page for
-    # comparing with the original cached version to see if a refresh
-    # is needed.
-    new_page = PageNav(saved_page)
-    path_pieces = saved_page.get_materialized_path().split("/")
-    items = site_nav.get_items_for_type('page')
-    # Find the original page.
-    for key, id_set in items:
-        if new_page.pk in id_set:
-            _, pages = site_nav['Main']
-            initial = path_pieces.pop(0)
-            for page in pages:
-                if hasattr(page, 'slug') and page.slug == initial:
-                    try:
-                        leaf = reduce(lambda n, k: n[k], path_pieces, pages[1])
-                    except KeyError:
-                        leaf = None
-                    if not leaf:
-                        # Page does not exist where it's supposed to, may have been moved.
-                        site_nav.recache(key)
-                    else:
-                        # Compare existing page and current to see if recache is needed.
-                        if leaf == new_page:
-                            return
-                        site_nav.recache(key)
+    for nav_name in site_nav.keys():
+        nav_page_ids = site_nav._get_node_id_sets(nav_name)['page']
+        if instance.pk in nav_page_ids:
+            site_nav.recache(nav_name)
+
+
+@receiver(page_edited)
+def menu_item_edited(sender, page, created=False, **kwargs):
+    """
+    This custom signal is fired by page manager whenever a page is edited
+    in the admin.
+    """    
+    if created:
+        # If the page is not going to appear in the nav, don't bother
+        # to recache.
+        if page.is_published() and page.page_layout.show_in_nav:
+            # If the item is newly-created, it won't be in the cache yet, so
+            # it's parent will be used instead.
+            page = page.parent
+    for nav_name in site_nav.keys():
+        nav_page_ids = site_nav._get_node_id_sets(nav_name)['page']
+        if page.pk in nav_page_ids:
+            _, pages = site_nav[nav_name]
+            site_nav.recache(nav_name)
+
+
+@receiver(page_moved)
+def menu_item_moved(sender, branch_ids, **kwargs):
+    """
+    A custom signal fired when pages are moved in the admin.
+    
+    The branch IDs passed in here represent page IDs which may have been affected
+    by the move. Find all Nav items that also contain these IDs.
+    """
+    for nav_name in site_nav.keys():
+        nav_page_ids = site_nav._get_node_id_sets(nav_name)['page']
+        if nav_page_ids.intersection(branch_ids):
+            site_nav.recache(nav_name)
