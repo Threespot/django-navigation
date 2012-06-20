@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import admin
 from django.core.urlresolvers import reverse
 from django.http import HttpResponse, Http404, HttpResponseRedirect
@@ -7,11 +8,22 @@ from django.utils.encoding import force_unicode
 from navigation.models import Menu, MenuItem, MenuPage, MenuFolder, MenuLink
 
 
+# Account for the fact that admin media may need to be served over SSL.
+try:
+    BASE_URL = settings.SECURE_STATIC_URL
+except ImportError:
+    BASE_URL = settings.STATIC_URL
+finally:
+    from urlparse import urljoin
+    absolute_path = lambda pth: urljoin(BASE_URL, pth)
+    
+
+
 class MenuAdmin(admin.ModelAdmin):
     change_form_template = 'navigation/menu_change.html'
 
     class Media:
-        js = ("js/admin_rebuild_nav.js",)
+        js = (absolute_path("js/admin_rebuild_nav.js"),)
 
     def changelist_view(self, request, extra_context=None):
         """
@@ -39,7 +51,6 @@ class MenuAdmin(admin.ModelAdmin):
             for item_id, values in request.POST.iteritems():
                 menu_id, po = values.split(':')
                 parent, order = po.split(',')
-                menu = Menu.objects.get(pk=int(menu_id))
                 item = MenuItem.objects.get(pk=int(item_id))
                 try:
                     item.parent = MenuItem.objects.get(pk=parent)
@@ -119,7 +130,6 @@ class MenuLeafAdmin(admin.ModelAdmin):
         Determines the HttpResponse for the change_view stage.
         """
         opts = obj._meta
-        pk_value = obj._get_pk_val()
 
         msg = 'The menu item "%s" was changed successfully.' % force_unicode(obj)
 
