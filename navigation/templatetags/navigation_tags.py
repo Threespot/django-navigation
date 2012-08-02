@@ -9,8 +9,6 @@ from navigation.models import Menu, MenuItem
 from pagemanager.models import Page
 from pagemanager.models import attach_generics as attach_page_generics
 
-from navigation.cache import site_nav
-
 
 # Regex that matches on leading or trailing slashes.
 outer_slashes = re.compile("(^/|/$)")
@@ -58,7 +56,6 @@ class RenderMenuNode(template.Node):
         self.menu_name = menu_name
 
     def render(self, context):
-
         try:
             path = context.get('request').META['PATH_INFO']
         except AttributeError:
@@ -129,6 +126,7 @@ def fast_menu(request, nav_name, prefix=None):
     prefix can be a string with an initial, ignorable part of the path (e.g. resources)
 
     """
+    from navigation.cache import site_nav
     if nav_name not in site_nav:
         raise KeyError('Unknown site nav name: "%s"' % nav_name)
     container, menu_list = site_nav[nav_name]
