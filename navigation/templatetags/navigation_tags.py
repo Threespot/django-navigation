@@ -63,7 +63,7 @@ class RenderMenuNode(template.Node):
             path = "/"
 
         menu = Menu.objects.get(name__iexact=self.menu_name)
-        nodes = list(MenuItem.tree.filter(menu=menu))
+        nodes = list(MenuItem.objects.filter(menu=menu))
         attach_menu_generics(nodes, prefetch_pages=True)
         template = menu.template
 
