@@ -128,7 +128,8 @@ def fast_menu(request, nav_name, prefix=None):
     """
     from navigation.cache import site_nav
     if nav_name not in site_nav:
-        raise KeyError('Unknown site nav name: "%s"' % nav_name)
+        #raise KeyError('Unknown site nav name: "%s"' % nav_name)
+        return None
     container, menu_list = site_nav[nav_name]
     # Strip outer slashes and split path into a list of slugs.
     try:
